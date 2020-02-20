@@ -1,95 +1,70 @@
 #!/usr/bin/python
-import numpy
-import sys
-import os
-from keras.models import Sequential
-from keras.layers import Dense,Activation,Dropout
-from keras.optimizers import RMSprop
-from keras.utils import np_utils
 from keras.models import load_model
+import numpy as np
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow import keras
+from sklearn.metrics import confusion_matrix
+from keras.utils import np_utils
 
-out_classes=4
-batch_size=128
-num_digits=10
+BATCH=32
+EPOCHS=100
+num_classes=10
 
-def fixx(n,fw):
-    t=0
-    if(int(n)%3==0):
-        #print('fizz',end='')
-        t=3
-    if(int(n)%5==0):
-        #print('buzz',end='')
-        if(t==3):
-            t=15
-        else:
-            t=5
-    if(t==0):
-        #print(n,end='')
-        fw.write(n)
-    else:
-        #print("\n",end='')
-        if(t==3):
-            fw.write('fizz\n')
-        if(t==5):
-            fw.write('buzz\n')
-        if(t==15):
-            fw.write('fizzbuzz\n')
+def test_model(model,xtest,ytest):
+    loss,acc=model.evaluate(xtest,ytest)
+    yout=model.predict(xtest)
+    yout=np.argmax(yout,axis=1)
+    ytest=np.argmax(ytest,axis=1)
+    #print(yout[0])
+    return loss,ytest,yout
 
-def software1(file):
-    fp=open(file,"r")
-    fw=open("Software1.txt","w")
-    for n in fp:
-        fixx(n,fw)
-    print('\nSoftware1.txt generated, logic based\n')
+def run_models():
+    fashion_mnist=keras.datasets.fashion_mnist
+    (x,y),(xtest,ytest) = fashion_mnist.load_data()
+
+    x=x.reshape((x.shape[0],28,28,1))
+    xtest=xtest.reshape((xtest.shape[0],28,28,1))
+
+    x=x.astype('float32')/255
+    xtest=xtest.astype('float32')/255
+
+    y=np_utils.to_categorical(y,num_classes)
+    ytest=np_utils.to_categorical(ytest,num_classes)
+
+    print("Testing CNN Model\n")
+    model=load_model('models/model_cnn_adam.h5')
+    #model.summary()
+    loss,gt,pred=test_model(model,xtest,ytest)
+
+    confusion=confusion_matrix(gt,pred)
+    print(np.array(confusion))
+
+    fp=open("convolution-neural-net.txt","w")
+    fp.write('Loss on Test Data : {}\n'.format(loss))
+    fp.write("Accuracy on Test Data : {}\n".format(np.mean(np.array(gt)==np.array(pred))))
+    fp.write("gt_label,pred_label \n")
+    for i in range(len(gt)):
+        fp.write("{},{}\n".format(gt[i],pred[i]))
     fp.close()
-    fw.close()
 
-def bin_encode(i):
-    return [i >> d & 1 for d in range(num_digits)]
+    print("\n\nTesting MLP Model\n")
+    model=load_model('models/model_mlp.h5')
+    #model.summary()
+    loss,gt,pred=test_model(model,xtest,ytest)
 
-def fizz_buzz_pred(i, pred):
-    return [str(i), "fizz", "buzz", "fizzbuzz"][pred.argmax()]
+    confusion=confusion_matrix(gt,pred)
+    print(np.array(confusion))
 
-def fizz_buzz(i):
-    if   i % 15 == 0: return "fizzbuzz"
-    elif i % 5  == 0: return "buzz"
-    elif i % 3  == 0: return "fizz"
-    else:             return str(i)
-
-def outModel(file):
-    model=load_model('model1')
-    fp=open(file,"r")
-    fw=open("Software2.txt","w")
-    errors=0
-    correct=0
-    count=0
-    for n in fp:
-        i=int(n)
-        count=count+1
-        x=bin_encode(i)
-        y = model.predict(numpy.array(x).reshape(-1,10))
-        print(fizz_buzz_pred(i,y))
-        fw.write(fizz_buzz_pred(i,y)+'\n')
-        if fizz_buzz_pred(i,y) == fizz_buzz(i):
-            correct = correct + 1
-        else:
-            errors = errors + 1
+    fp=open("multi-layer-net.txt","w")
+    fp.write('Loss on Test Data : {}\n'.format(loss))
+    fp.write("Accuracy on Test Data : {}\n".format(np.mean(np.array(gt)==np.array(pred))))
+    fp.write("gt_label,pred_label \n")
+    for i in range(len(gt)):
+        fp.write("{},{}\n".format(gt[i],pred[i]))
     fp.close()
-    fw.close()
-    print("Errors :" , errors, " Correct :", correct)
-    print("Accuracy : ",(correct/count)*100,'%')
-    print('\nSoftware2.txt generated, ML based')
-
-def software2(file):
-    if os.path.isfile('model1'):
-        print('\nModel exists')
-        outModel(file)
-    else:
-        print("\nModel doesn't exists")
 
 def main():
-    file=sys.argv[2]
-    software1(file)
-    software2(file)
+    run_models()
 
 main()
